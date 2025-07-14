@@ -48,5 +48,8 @@
   { "id": 47, "position_id": 3, "duration": 1, "date": "2000-01-12" },
   { "id": 48, "position_id": 3, "duration": 1, "date": "2000-01-12" },
   { "id": 49, "position_id": 3, "duration": 4, "date": "2000-01-15" },
-  { "id": 50, "position_id": 3, "duration": 4, "date": "2000-01-14" }
+  { "id": 50, "position_id": 3, "duration": 4, "date": "2000-01-14" },
+  { "id": 51, "position_id": null, "duration": 3, "date": "2000-01-11"},
+  { "id": 52, "duration": 2, "date": "2000-01-12"},
+  { "id": 53, "position_id": null, "duration": 1, "date": "2000-01-13"}
 ]

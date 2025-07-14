@@ -30,6 +30,9 @@ class WorkforceScheduleService:
     @staticmethod
     def aggregate_schedule_data(assignments, date_columns: List[str]) -> AggregatedScheduleData:
         """Aggregate assignments into positions and workers data."""
+        # Define constant for unassigned position
+        UNASSIGNED_POSITION = "Unassigned"
+
         # Nested mapping: position/worker -> {date_str -> hours}
         position_hours: DefaultDict[str, DefaultDict[str, int]] = defaultdict(lambda: defaultdict(int))
         worker_hours: DefaultDict[str, DefaultDict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -39,14 +42,18 @@ class WorkforceScheduleService:
         for assignment in assignments:
             date_str = assignment.work_date.strftime('%d %b')
 
+            # Determine position name - use "Unassigned" if no position
             if assignment.task.position:
                 position_name = assignment.task.position.name
-                position_hours[position_name][date_str] += assignment.hours
+            else:
+                position_name = UNASSIGNED_POSITION
 
-                if assignment.worker:
-                    worker_name = assignment.worker.name
-                    worker_hours[worker_name][date_str] += assignment.hours
-                    workers_by_position[position_name].add(worker_name)
+            position_hours[position_name][date_str] += assignment.hours
+
+            if assignment.worker:
+                worker_name = assignment.worker.name
+                worker_hours[worker_name][date_str] += assignment.hours
+                workers_by_position[position_name].add(worker_name)
 
         # Convert to schema objects
         positions = []

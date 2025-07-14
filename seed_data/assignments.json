@@ -48,5 +48,8 @@
   { "task_id": 47, "worker_id": 2 },
   { "task_id": 48, "worker_id": 9 },
   { "task_id": 49, "worker_id": 2 },
-  { "task_id": 50, "worker_id": 2 }
+  { "task_id": 50, "worker_id": 2 },
+  { "task_id": 51, "worker_id": 11 },
+  { "task_id": 52, "worker_id": 12 },
+  { "task_id": 53, "worker_id": 13 }
 ]

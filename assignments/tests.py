@@ -4,10 +4,13 @@ from datetime import date
 from .models import Position, Employee, Task, Assignment
 
 
-class WorkforceScheduleAPITest(TestCase):
+class WorkforceScheduleAPITestBase(TestCase):
+    """Base test class with common setup and helper methods."""
+
     def setUp(self):
-        """Set up test data"""
+        """Set up common test data"""
         self.client = Client()
+        self.base_date = date(2025, 1, 11)
 
         # Create positions
         self.position1 = Position.objects.create(name="Position 1")
@@ -20,188 +23,122 @@ class WorkforceScheduleAPITest(TestCase):
 
         # Create tasks
         self.task1 = Task.objects.create(
-            name="Task 1",
-            position=self.position1,
-            duration=8,
-            date=date(2025, 1, 11)
+            name="Task 1", position=self.position1, duration=8, date=self.base_date
         )
         self.task2 = Task.objects.create(
-            name="Task 2",
-            position=self.position1,
-            duration=6,
-            date=date(2025, 1, 12)
+            name="Task 2", position=self.position1, duration=6, date=date(2025, 1, 12)
         )
         self.task3 = Task.objects.create(
-            name="Task 3",
-            position=self.position2,
-            duration=5,
-            date=date(2025, 1, 11)
+            name="Task 3", position=self.position2, duration=5, date=self.base_date
         )
 
-        # Create assignments matching the example table
-        Assignment.objects.create(
-            worker=self.worker1,
-            task=self.task1,
-            work_date=date(2025, 1, 11),
-            hours=3
-        )
-        Assignment.objects.create(
-            worker=self.worker2,
-            task=self.task1,
-            work_date=date(2025, 1, 11),
-            hours=4
-        )
-        Assignment.objects.create(
-            worker=self.worker1,
-            task=self.task2,
-            work_date=date(2025, 1, 12),
-            hours=8
-        )
-        Assignment.objects.create(
-            worker=self.worker2,
-            task=self.task2,
-            work_date=date(2025, 1, 12),
-            hours=2
-        )
-        Assignment.objects.create(
-            worker=self.worker3,
-            task=self.task3,
-            work_date=date(2025, 1, 11),
-            hours=5
+        # Create base assignments
+        self._create_base_assignments()
+
+    def _create_base_assignments(self):
+        """Create standard test assignments."""
+        assignments = [
+            (self.worker1, self.task1, self.base_date, 3),
+            (self.worker2, self.task1, self.base_date, 4),
+            (self.worker1, self.task2, date(2025, 1, 12), 8),
+            (self.worker2, self.task2, date(2025, 1, 12), 2),
+            (self.worker3, self.task3, self.base_date, 5),
+        ]
+
+        for worker, task, work_date, hours in assignments:
+            Assignment.objects.create(worker=worker, task=task, work_date=work_date, hours=hours)
+
+    def get_api_response(self, start_date=None, end_date=None):
+        """Helper to get API response."""
+        params = {}
+        if start_date:
+            params['start_date'] = start_date
+        if end_date:
+            params['end_date'] = end_date
+        return self.client.get('/api/workforce-schedule', params)
+
+    def find_row_by_name_type(self, data, name, row_type):
+        """Helper to find a specific row in response data."""
+        return next(
+            (row for row in data['data'] if row['name'] == name and row['type'] == row_type),
+            None
         )
 
-    def test_workforce_schedule_with_date_range(self):
-        """Test the workforce schedule endpoint with specific date range"""
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-11',
-            'end_date': '2025-01-12'
-        })
+
+class WorkforceScheduleBasicTest(WorkforceScheduleAPITestBase):
+    """Test basic functionality of the workforce schedule API."""
+
+    def test_date_range_functionality(self):
+        """Test API with date range and verify structure and calculations."""
+        response = self.get_api_response('2025-01-11', '2025-01-12')
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
-        # Verify response structure
+        # Verify structure
         self.assertIn('data', data)
         self.assertIn('date_columns', data)
-
-        # Verify date columns
-        expected_dates = ['11 Jan', '12 Jan']
-        self.assertEqual(data['date_columns'], expected_dates)
-
-        # Find position and worker data
-        position1_data = None
-        position2_data = None
-        worker1_data = None
-        worker2_data = None
-        worker3_data = None
-
-        for row in data['data']:
-            if row['name'] == 'Position 1' and row['type'] == 'position':
-                position1_data = row
-            elif row['name'] == 'Position 2' and row['type'] == 'position':
-                position2_data = row
-            elif row['name'] == 'Worker 1' and row['type'] == 'worker':
-                worker1_data = row
-            elif row['name'] == 'Worker 2' and row['type'] == 'worker':
-                worker2_data = row
-            elif row['name'] == 'Worker 3' and row['type'] == 'worker':
-                worker3_data = row
+        self.assertEqual(data['date_columns'], ['11 Jan', '12 Jan'])
 
         # Verify position totals
-        self.assertIsNotNone(position1_data)
-        self.assertEqual(position1_data['daily_hours']['11 Jan'], 7)  # 3 + 4
-        self.assertEqual(position1_data['daily_hours']['12 Jan'], 10)  # 8 + 2
+        pos1 = self.find_row_by_name_type(data, 'Position 1', 'position')
+        pos2 = self.find_row_by_name_type(data, 'Position 2', 'position')
 
-        self.assertIsNotNone(position2_data)
-        self.assertEqual(position2_data['daily_hours']['11 Jan'], 5)
-        self.assertEqual(position2_data['daily_hours']['12 Jan'], 0)
+        self.assertIsNotNone(pos1)
+        self.assertEqual(pos1['daily_hours'], {'11 Jan': 7, '12 Jan': 10})
+
+        self.assertIsNotNone(pos2)
+        self.assertEqual(pos2['daily_hours'], {'11 Jan': 5, '12 Jan': 0})
 
         # Verify worker hours
-        self.assertIsNotNone(worker1_data)
-        self.assertEqual(worker1_data['daily_hours']['11 Jan'], 3)
-        self.assertEqual(worker1_data['daily_hours']['12 Jan'], 8)
+        worker1 = self.find_row_by_name_type(data, 'Worker 1', 'worker')
+        worker2 = self.find_row_by_name_type(data, 'Worker 2', 'worker')
+        worker3 = self.find_row_by_name_type(data, 'Worker 3', 'worker')
 
-        self.assertIsNotNone(worker2_data)
-        self.assertEqual(worker2_data['daily_hours']['11 Jan'], 4)
-        self.assertEqual(worker2_data['daily_hours']['12 Jan'], 2)
+        self.assertEqual(worker1['daily_hours'], {'11 Jan': 3, '12 Jan': 8})
+        self.assertEqual(worker2['daily_hours'], {'11 Jan': 4, '12 Jan': 2})
+        self.assertEqual(worker3['daily_hours'], {'11 Jan': 5, '12 Jan': 0})
 
-        self.assertIsNotNone(worker3_data)
-        self.assertEqual(worker3_data['daily_hours']['11 Jan'], 5)
-        self.assertEqual(worker3_data['daily_hours']['12 Jan'], 0)
-
-    def test_workforce_schedule_single_day(self):
-        """Test with single day date range"""
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-11',
-            'end_date': '2025-01-11'
-        })
-
-        self.assertEqual(response.status_code, 200)
+    def test_single_day_and_missing_parameters(self):
+        """Test single day queries and parameter handling."""
+        # Single day
+        response = self.get_api_response('2025-01-11', '2025-01-11')
         data = response.json()
-
-        # Should only have one date column
         self.assertEqual(data['date_columns'], ['11 Jan'])
 
-        # Check that all rows have data for only one date
-        for row in data['data']:
-            self.assertEqual(len(row['daily_hours']), 1)
-            self.assertIn('11 Jan', row['daily_hours'])
+        # Missing end date
+        response = self.get_api_response('2025-01-11')
+        data = response.json()
+        self.assertEqual(data['date_columns'], ['11 Jan'])
 
-    def test_workforce_schedule_no_data(self):
-        """Test with date range that has no assignments"""
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-15',
-            'end_date': '2025-01-16'
-        })
+        # No parameters (uses today)
+        response = self.get_api_response()
+        data = response.json()
+        today = date.today()
+        self.assertEqual(data['date_columns'], [today.strftime('%d %b')])
 
-        self.assertEqual(response.status_code, 200)
+    def test_no_data_scenarios(self):
+        """Test scenarios with no data."""
+        response = self.get_api_response('2025-01-15', '2025-01-16')
         data = response.json()
 
-        # Should have date columns but empty data
         self.assertEqual(data['date_columns'], ['15 Jan', '16 Jan'])
         self.assertEqual(data['data'], [])
 
-    def test_workforce_schedule_default_dates(self):
-        """Test endpoint without date parameters (uses today)"""
-        response = self.client.get('/api/workforce-schedule')
 
-        self.assertEqual(response.status_code, 200)
+class WorkforceScheduleSchemaTest(WorkforceScheduleAPITestBase):
+    """Test response schema validation."""
+
+    def test_response_schema_structure(self):
+        """Verify API response matches expected schema."""
+        response = self.get_api_response('2025-01-11', '2025-01-12')
         data = response.json()
 
-        # Should use today's date
-        today = date.today()
-        expected_date = today.strftime('%d %b')
-        self.assertEqual(data['date_columns'], [expected_date])
-
-    def test_workforce_schedule_missing_end_date(self):
-        """Test with only start_date provided"""
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-11'
-        })
-
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-
-        # Should use start_date as end_date too
-        self.assertEqual(data['date_columns'], ['11 Jan'])
-
-    def test_workforce_schedule_response_schema(self):
-        """Test that response matches expected schema"""
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-11',
-            'end_date': '2025-01-12'
-        })
-
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-
-        # Check top-level structure
-        self.assertIn('data', data)
-        self.assertIn('date_columns', data)
+        # Top-level structure
         self.assertIsInstance(data['data'], list)
         self.assertIsInstance(data['date_columns'], list)
 
-        # Check each data row structure
+        # Row structure
         for row in data['data']:
             self.assertIn('name', row)
             self.assertIn('type', row)
@@ -210,60 +147,103 @@ class WorkforceScheduleAPITest(TestCase):
             self.assertIn(row['type'], ['position', 'worker'])
             self.assertIsInstance(row['daily_hours'], dict)
 
-            # Check that daily_hours has correct date keys
+            # Verify date keys match columns
             for date_key in row['daily_hours']:
                 self.assertIn(date_key, data['date_columns'])
                 self.assertIsInstance(row['daily_hours'][date_key], int)
 
-    def test_workforce_schedule_with_unassigned_workers(self):
-        """Test that workers without assignments in date range are not included"""
-        # Create a worker with no assignments in our test date range
-        Employee.objects.create(
-            name="Unassigned Worker",
-            position=self.position1
+
+class WorkforceScheduleUnassignedTest(WorkforceScheduleAPITestBase):
+    """Test handling of workers and tasks without positions."""
+
+    def test_unassigned_workers_and_tasks(self):
+        """Test that unassigned workers/tasks are grouped under 'Unassigned'."""
+        # Create unassigned workers and tasks
+        unassigned_worker1 = Employee.objects.create(name="Unassigned Worker 1")
+        unassigned_worker2 = Employee.objects.create(name="Unassigned Worker 2", position=None)
+
+        unassigned_task1 = Task.objects.create(
+            name="General Task 1", duration=3, date=date(2025, 1, 11)
+        )
+        unassigned_task2 = Task.objects.create(
+            name="General Task 2", position=None, duration=2, date=date(2025, 1, 12)
         )
 
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-11',
-            'end_date': '2025-01-12'
-        })
-
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-
-        # Unassigned worker should not appear in results
-        worker_names = [row['name'] for row in data['data'] if row['type'] == 'worker']
-        self.assertNotIn('Unassigned Worker', worker_names)
-
-    def test_workforce_schedule_multiple_assignments_same_day(self):
-        """Test aggregation when worker has multiple assignments on same day"""
-        # Add another assignment for worker1 on the same day
-        task4 = Task.objects.create(
-            name="Task 4",
-            position=self.position1,
-            duration=2,
-            date=date(2025, 1, 11)
+        # Create assignments
+        Assignment.objects.create(
+            worker=unassigned_worker1, task=unassigned_task1,
+            work_date=date(2025, 1, 11), hours=3
         )
         Assignment.objects.create(
-            worker=self.worker1,
-            task=task4,
-            work_date=date(2025, 1, 11),
-            hours=2
+            worker=unassigned_worker2, task=unassigned_task2,
+            work_date=date(2025, 1, 12), hours=2
         )
 
-        response = self.client.get('/api/workforce-schedule', {
-            'start_date': '2025-01-11',
-            'end_date': '2025-01-11'
-        })
-
-        self.assertEqual(response.status_code, 200)
+        response = self.get_api_response('2025-01-11', '2025-01-12')
         data = response.json()
 
-        # Find worker1 data
-        worker1_data = next(
-            row for row in data['data']
-            if row['name'] == 'Worker 1' and row['type'] == 'worker'
+        # Verify "Unassigned" position
+        unassigned_pos = self.find_row_by_name_type(data, 'Unassigned', 'position')
+        self.assertIsNotNone(unassigned_pos)
+        self.assertEqual(unassigned_pos['daily_hours'], {'11 Jan': 3, '12 Jan': 2})
+
+        # Verify unassigned workers
+        worker1 = self.find_row_by_name_type(data, 'Unassigned Worker 1', 'worker')
+        worker2 = self.find_row_by_name_type(data, 'Unassigned Worker 2', 'worker')
+
+        self.assertEqual(worker1['daily_hours'], {'11 Jan': 3, '12 Jan': 0})
+        self.assertEqual(worker2['daily_hours'], {'11 Jan': 0, '12 Jan': 2})
+
+    def test_mixed_assigned_and_unassigned(self):
+        """Test mix of assigned and unassigned workers."""
+        unassigned_worker = Employee.objects.create(name="General Worker")
+        unassigned_task = Task.objects.create(
+            name="Maintenance Work", duration=4, date=date(2025, 1, 11)
+        )
+        Assignment.objects.create(
+            worker=unassigned_worker, task=unassigned_task,
+            work_date=date(2025, 1, 11), hours=4
         )
 
+        response = self.get_api_response('2025-01-11', '2025-01-12')
+        data = response.json()
+
+        # Should have both regular positions and "Unassigned"
+        position_names = [row['name'] for row in data['data'] if row['type'] == 'position']
+        self.assertIn('Position 1', position_names)
+        self.assertIn('Position 2', position_names)
+        self.assertIn('Unassigned', position_names)
+
+        # Verify "Unassigned" position hours
+        unassigned = self.find_row_by_name_type(data, 'Unassigned', 'position')
+        self.assertEqual(unassigned['daily_hours'], {'11 Jan': 4, '12 Jan': 0})
+
+
+class WorkforceScheduleEdgeCaseTest(WorkforceScheduleAPITestBase):
+    """Test edge cases and special scenarios."""
+
+    def test_multiple_assignments_same_day(self):
+        """Test aggregation when worker has multiple assignments on same day."""
+        task4 = Task.objects.create(
+            name="Task 4", position=self.position1, duration=2, date=date(2025, 1, 11)
+        )
+        Assignment.objects.create(
+            worker=self.worker1, task=task4, work_date=date(2025, 1, 11), hours=2
+        )
+
+        response = self.get_api_response('2025-01-11', '2025-01-11')
+        data = response.json()
+
+        worker1 = self.find_row_by_name_type(data, 'Worker 1', 'worker')
         # Should aggregate both assignments: 3 + 2 = 5
-        self.assertEqual(worker1_data['daily_hours']['11 Jan'], 5)
+        self.assertEqual(worker1['daily_hours']['11 Jan'], 5)
+
+    def test_unassigned_workers_not_in_date_range(self):
+        """Test that workers without assignments in date range are excluded."""
+        Employee.objects.create(name="Unassigned Worker", position=self.position1)
+
+        response = self.get_api_response('2025-01-11', '2025-01-12')
+        data = response.json()
+
+        worker_names = [row['name'] for row in data['data'] if row['type'] == 'worker']
+        self.assertNotIn('Unassigned Worker', worker_names)
