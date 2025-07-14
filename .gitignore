@@ -3,3 +3,6 @@
 
 # Virtual Environment
 .venv
+
+# Database
+*.sqlite3
