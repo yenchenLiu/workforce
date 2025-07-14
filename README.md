@@ -34,6 +34,18 @@ This is a Django-based workforce scheduling application.
 
 The application will be available at `http://127.0.0.1:8000/`.
 
+## Testing
+
+To run the unit tests, use the following command:
+
+```bash
+python manage.py test
+```
+
+## API Documentation
+
+To view the API documentation, navigate to `http://127.0.0.1:8000/api/docs` in your browser.
+
 ## API Documentation
 
 To view the API documentation, navigate to `http://127.0.0.1:8000/api/docs` in your browser.
