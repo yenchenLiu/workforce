@@ -1,12 +1,13 @@
 from ninja import NinjaAPI, Swagger
 from datetime import date
+from django.http import HttpRequest
 from .services import WorkforceScheduleService, TaskAssignmentService
 from .schemas import WorkforceScheduleRowSchema, WorkforceScheduleResponseSchema, TaskAssignmentResponseSchema
 
 api = NinjaAPI(docs=Swagger(settings={"persistAuthorization": True}))
 
 @api.get("/workforce-schedule", response=WorkforceScheduleResponseSchema)
-def get_workforce_schedule(request, start_date: date | None = None, end_date: date | None = None):
+def get_workforce_schedule(request: HttpRequest, start_date: date | None = None, end_date: date | None = None) -> WorkforceScheduleResponseSchema:
     """
     Get workforce schedule data formatted for frontend table display.
     Returns positions and workers with their daily hour totals.
@@ -46,7 +47,7 @@ def get_workforce_schedule(request, start_date: date | None = None, end_date: da
     )
 
 @api.post("/assign-tasks", response=TaskAssignmentResponseSchema)
-def assign_tasks(request, start_date: date, end_date: date):
+def assign_tasks(request: HttpRequest, start_date: date, end_date: date) -> TaskAssignmentResponseSchema:
     """
     Assign tasks to workers using greedy balanced approach.
     Returns task assignments and KPI metrics.

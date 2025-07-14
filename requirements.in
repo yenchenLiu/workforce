@@ -4,3 +4,4 @@ django-stubs[compatible-mypy]~=5.2.1
 ruff
 coverage
 inequality
+pulp

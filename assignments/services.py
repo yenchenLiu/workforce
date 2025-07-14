@@ -1,12 +1,13 @@
 from datetime import date, timedelta
 from typing import DefaultDict
-from collections import defaultdict
 from inequality import gini  # type: ignore
 from .models import Assignment, Task, Employee
 from .schemas import (
     PositionHoursData, WorkerHoursData, AggregatedScheduleData,
     TaskAssignmentSchema, KPIMetricsSchema
 )
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, LpBinary, PulpSolverError  # type: ignore
+from collections import defaultdict
 
 
 class WorkforceScheduleService:
@@ -138,67 +139,69 @@ class TaskAssignmentService:
     """Service class for task assignment operations."""
 
     @staticmethod
-    def assign_tasks_to_workers(tasks, employees, max_hours_per_day=8):
-        """
-        Assign tasks to employees using greedy balanced approach.
-        Groups by date and position, assigns to worker with least current load.
-        """
-        # Group tasks by date and position
-        tasks_by_date_position = defaultdict(list)
+    def assign_tasks_using_lp(tasks, employees, max_hours_per_day=8):
+        """Assign tasks using Linear Programming optimization via pulp."""
+
+        task_lookup = {task.id: task for task in tasks}
+        employee_lookup = {emp.id: emp for emp in employees}
+
+        # Define LP problem
+        problem = LpProblem("Task_Assignment", LpMaximize)
+
+        # Create variables: x[task_id][emp_id] = 1 if assigned
+        x = {}
         for task in tasks:
-            position_name = task.position.name if task.position else "Unassigned"
-            key = (task.date, position_name)
-            tasks_by_date_position[key].append(task)
+            task_pos = task.position.id if task.position else "Unassigned"
+            for emp in employees:
+                emp_pos = emp.position.id if emp.position else "Unassigned"
+                if task_pos == emp_pos:
+                    var_name = f"x_{task.id}_{emp.id}"
+                    x[(task.id, emp.id)] = LpVariable(var_name, cat=LpBinary)
 
-        # Group employees by position
-        employees_by_position = defaultdict(list)
-        for employee in employees:
-            position_name = employee.position.name if employee.position else "Unassigned"
-            employees_by_position[position_name].append(employee)
+        # Objective: Maximize total assigned task duration
+        problem += lpSum(x[t, e] * task_lookup[t].duration for (t, e) in x)
 
-        # Track worker daily loads
-        worker_daily_loads = defaultdict(lambda: defaultdict(int))
+        # Constraint: Each task assigned to at most one employee
+        for task in tasks:
+            problem += lpSum(x.get((task.id, e.id), 0) for e in employees) <= 1
+
+        # Constraint: Each employee cannot exceed max hours per day
+        dates = sorted(set(task.date for task in tasks))
+        for emp in employees:
+            for d in dates:
+                relevant_tasks = [task for task in tasks if task.date == d and (task.id, emp.id) in x]
+                problem += lpSum(x[(t.id, emp.id)] * t.duration for t in relevant_tasks) <= max_hours_per_day
+
+        try:
+            problem.solve()
+        except PulpSolverError as e:
+            raise RuntimeError("Failed to solve LP problem") from e
+
         assignments = []
         unassigned_tasks = []
+        worker_daily_loads = defaultdict(lambda: defaultdict(int))
 
-        # Process each date-position group
-        for (task_date, position_name), position_tasks in tasks_by_date_position.items():
-            available_workers = employees_by_position.get(position_name, [])
+        # Parse result
+        assigned_task_ids = set()
+        for (t_id, e_id), var in x.items():
+            if var.value() == 1:
+                task = task_lookup[t_id]
+                emp = employee_lookup[e_id]
+                assignments.append({
+                    'task': task,
+                    'worker': emp,
+                    'work_date': task.date,
+                    'hours': task.duration
+                })
+                worker_daily_loads[emp.id][task.date] += task.duration
+                assigned_task_ids.add(t_id)
 
-            if not available_workers:
-                # No workers for this position
-                unassigned_tasks.extend(position_tasks)
-                continue
-
-            # Sort tasks by duration (descending) for better packing
-            position_tasks.sort(key=lambda t: t.duration)
-
-            for task in position_tasks:
-                # Find worker with minimum load who can still take this task
-                best_worker = None
-                min_load = float('inf')
-
-                for worker in available_workers:
-                    current_load = worker_daily_loads[worker.id][task_date]
-                    if current_load + task.duration <= max_hours_per_day:
-                        if current_load < min_load:
-                            min_load = current_load
-                            best_worker = worker
-
-                if best_worker:
-                    # Assign task to best worker
-                    worker_daily_loads[best_worker.id][task_date] += task.duration
-                    assignments.append({
-                        'task': task,
-                        'worker': best_worker,
-                        'work_date': task_date,
-                        'hours': task.duration
-                    })
-                else:
-                    # No available worker for this task
-                    unassigned_tasks.append(task)
+        for task in tasks:
+            if task.id not in assigned_task_ids:
+                unassigned_tasks.append(task)
 
         return assignments, unassigned_tasks, worker_daily_loads
+
     @staticmethod
     def calculate_kpi_metrics(assignments, unassigned_tasks,
                               worker_daily_loads, employees,
@@ -262,7 +265,7 @@ class TaskAssignmentService:
         employees = list(Employee.objects.all().select_related('position'))
 
         # Perform assignment
-        assignments, unassigned_tasks, worker_daily_loads = cls.assign_tasks_to_workers(tasks, employees)
+        assignments, unassigned_tasks, worker_daily_loads = cls.assign_tasks_using_lp(tasks, employees)
 
         # Calculate KPIs
         kpi_metrics = cls.calculate_kpi_metrics(assignments, unassigned_tasks, worker_daily_loads, employees)
