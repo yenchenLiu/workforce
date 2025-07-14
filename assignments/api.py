@@ -1,7 +1,7 @@
 from ninja import NinjaAPI, Swagger
 from datetime import date
-from .services import WorkforceScheduleService
-from .schemas import WorkforceScheduleRowSchema, WorkforceScheduleResponseSchema
+from .services import WorkforceScheduleService, TaskAssignmentService
+from .schemas import WorkforceScheduleRowSchema, WorkforceScheduleResponseSchema, TaskAssignmentResponseSchema
 
 api = NinjaAPI(docs=Swagger(settings={"persistAuthorization": True}))
 
@@ -43,4 +43,30 @@ def get_workforce_schedule(request, start_date: date | None = None, end_date: da
     return WorkforceScheduleResponseSchema(
         data=result_data,
         date_columns=date_columns
+    )
+
+@api.post("/assign-tasks", response=TaskAssignmentResponseSchema)
+def assign_tasks(request, start_date: date, end_date: date):
+    """
+    Assign tasks to workers using greedy balanced approach.
+    Returns task assignments and KPI metrics.
+
+    Strategy:
+    - Groups tasks by date and position
+    - Uses greedy algorithm to assign tasks to workers with least current load
+    - Respects position matching and 8-hour daily capacity constraints
+
+    KPIs returned:
+    - utilization_rate: Total assigned hours / (workers × 8 hours)
+    - max_worker_load: Highest daily load across all workers
+    - unassigned_hours: Total hours of tasks that couldn't be assigned
+    - gini_coefficient: Measures workload distribution equality (0 = perfectly equal)
+    """
+    # Get assignment data using service
+    assignment_schemas, kpi_metrics, summary = TaskAssignmentService.create_task_assignments(start_date, end_date)
+
+    return TaskAssignmentResponseSchema(
+        assignments=assignment_schemas,
+        kpi_metrics=kpi_metrics,
+        summary=summary
     )

@@ -345,6 +345,192 @@ class WorkforceScheduleUnassignedTasksTest(WorkforceScheduleAPITestBase):
         self.assertEqual(len(unassigned_tasks_rows), 0)
 
 
+class TaskAssignmentAPITest(WorkforceScheduleAPITestBase):
+    """Test the task assignment API endpoint."""
+
+    def test_task_assignment_basic_functionality(self):
+        """Test basic task assignment functionality."""
+        response = self.client.post('/api/assign-tasks', query_params={
+            'start_date': '2025-01-11',
+            'end_date': '2025-01-12'
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        # Verify response structure
+        self.assertIn('assignments', data)
+        self.assertIn('kpi_metrics', data)
+        self.assertIn('summary', data)
+
+        # Verify assignments structure
+        for assignment in data['assignments']:
+            self.assertIn('task_id', assignment)
+            self.assertIn('worker_id', assignment)
+            self.assertIn('worker_name', assignment)
+            self.assertIn('position_name', assignment)
+            self.assertIn('work_date', assignment)
+            self.assertIn('hours', assignment)
+
+        # Verify KPI metrics structure
+        kpi = data['kpi_metrics']
+        self.assertIn('utilization_rate', kpi)
+        self.assertIn('max_worker_load', kpi)
+        self.assertIn('unassigned_hours', kpi)
+        self.assertIn('gini_coefficient', kpi)
+        self.assertIn('total_workers', kpi)
+        self.assertIn('total_tasks', kpi)
+        self.assertIn('total_assigned_hours', kpi)
+
+        # Verify summary structure
+        summary = data['summary']
+        self.assertIn('assigned_tasks', summary)
+        self.assertIn('unassigned_tasks', summary)
+        self.assertIn('total_positions', summary)
+
+    def test_task_assignment_position_matching(self):
+        """Test that tasks are only assigned to workers with matching positions."""
+        # Create specific tasks and workers for testing
+        Task.objects.all().delete()
+        Assignment.objects.all().delete()
+
+        # Create tasks for Position 1
+        task1 = Task.objects.create(
+            name="Position 1 Task",
+            position=self.position1,
+            duration=4,
+            date=date(2025, 1, 11)
+        )
+
+        # Create tasks for Position 2
+        task2 = Task.objects.create(
+            name="Position 2 Task",
+            position=self.position2,
+            duration=3,
+            date=date(2025, 1, 11)
+        )
+
+        response = self.client.post('/api/assign-tasks', query_params={
+            'start_date': '2025-01-11',
+            'end_date': '2025-01-11'
+        })
+
+        data = response.json()
+
+        # Verify position matching
+        for assignment in data['assignments']:
+            if assignment['task_id'] == task1.id:
+                # Should be assigned to Position 1 worker
+                self.assertIn(assignment['worker_name'], ['Worker 1', 'Worker 2'])
+            elif assignment['task_id'] == task2.id:
+                # Should be assigned to Position 2 worker
+                self.assertEqual(assignment['worker_name'], 'Worker 3')
+
+    def test_task_assignment_capacity_limits(self):
+        """Test that workers don't exceed 8-hour daily capacity."""
+        # Create tasks that would exceed capacity if not properly managed
+        Task.objects.all().delete()
+        Assignment.objects.all().delete()
+
+        # Create multiple tasks for Position 1 on the same day
+        for i in range(5):
+            Task.objects.create(
+                name=f"Long Task {i+1}",
+                position=self.position1,
+                duration=3,  # 5 tasks × 3 hours = 15 hours total
+                date=date(2025, 1, 11)
+            )
+
+        response = self.client.post('/api/assign-tasks', query_params={
+            'start_date': '2025-01-11',
+            'end_date': '2025-01-11'
+        })
+
+        data = response.json()
+
+        # Calculate worker loads
+        worker_loads = {}
+        for assignment in data['assignments']:
+            worker_name = assignment['worker_name']
+            if worker_name not in worker_loads:
+                worker_loads[worker_name] = 0
+            worker_loads[worker_name] += assignment['hours']
+
+        # Verify no worker exceeds 8 hours
+        for worker_name, total_hours in worker_loads.items():
+            self.assertLessEqual(total_hours, 8, f"Worker {worker_name} exceeded 8-hour limit")
+
+        # Verify max_worker_load KPI
+        kpi = data['kpi_metrics']
+        self.assertLessEqual(kpi['max_worker_load'], 8)
+
+    def test_task_assignment_kpi_calculations(self):
+        """Test KPI metric calculations."""
+        # Create a controlled scenario
+        Task.objects.all().delete()
+        Assignment.objects.all().delete()
+
+        # Create exactly 8 hours of work for Position 1 (should utilize 1 worker fully)
+        Task.objects.create(
+            name="Full Day Task",
+            position=self.position1,
+            duration=8,
+            date=date(2025, 1, 11)
+        )
+
+        response = self.client.post('/api/assign-tasks', query_params={
+            'start_date': '2025-01-11',
+            'end_date': '2025-01-11'
+        })
+
+        data = response.json()
+        kpi = data['kpi_metrics']
+
+        # Should have some utilization since we have work
+        self.assertGreater(kpi['utilization_rate'], 0)
+
+        # Max worker load should be 8 (one worker fully utilized)
+        self.assertEqual(kpi['max_worker_load'], 8)
+
+        # Should have 8 hours assigned
+        self.assertEqual(kpi['total_assigned_hours'], 8)
+
+        # Should have 1 assigned task
+        self.assertEqual(data['summary']['assigned_tasks'], 1)
+
+    def test_task_assignment_unassigned_tasks(self):
+        """Test handling of tasks that cannot be assigned."""
+        # Create tasks for a position with no workers
+        Task.objects.all().delete()
+        Assignment.objects.all().delete()
+
+        # Create a position with no workers
+        orphan_position = Position.objects.create(name="Orphan Position")
+        Task.objects.create(
+            name="Orphan Task",
+            position=orphan_position,
+            duration=4,
+            date=date(2025, 1, 11)
+        )
+
+        response = self.client.post('/api/assign-tasks', query_params={
+            'start_date': '2025-01-11',
+            'end_date': '2025-01-11'
+        })
+
+        data = response.json()
+        kpi = data['kpi_metrics']
+
+        # Should have unassigned hours
+        self.assertEqual(kpi['unassigned_hours'], 4)
+
+        # Should have 1 unassigned task
+        self.assertEqual(data['summary']['unassigned_tasks'], 1)
+
+        # Should have 0 assigned tasks
+        self.assertEqual(data['summary']['assigned_tasks'], 0)
+
+
 class WorkforceScheduleEdgeCaseTest(WorkforceScheduleAPITestBase):
     """Test edge cases and special scenarios."""
 
