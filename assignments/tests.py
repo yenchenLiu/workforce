@@ -23,13 +23,13 @@ class WorkforceScheduleAPITestBase(TestCase):
 
         # Create tasks
         self.task1 = Task.objects.create(
-            name="Task 1", position=self.position1, duration=8, date=self.base_date
+            position=self.position1, duration=8, date=self.base_date
         )
         self.task2 = Task.objects.create(
-            name="Task 2", position=self.position1, duration=6, date=date(2025, 1, 12)
+            position=self.position1, duration=6, date=date(2025, 1, 12)
         )
         self.task3 = Task.objects.create(
-            name="Task 3", position=self.position2, duration=5, date=self.base_date
+            position=self.position2, duration=5, date=self.base_date
         )
 
         # Create base assignments
@@ -163,10 +163,10 @@ class WorkforceScheduleUnassignedTest(WorkforceScheduleAPITestBase):
         unassigned_worker2 = Employee.objects.create(name="Unassigned Worker 2", position=None)
 
         unassigned_task1 = Task.objects.create(
-            name="General Task 1", duration=3, date=date(2025, 1, 11)
+           duration=3, date=date(2025, 1, 11)
         )
         unassigned_task2 = Task.objects.create(
-            name="General Task 2", position=None, duration=2, date=date(2025, 1, 12)
+           position=None, duration=2, date=date(2025, 1, 12)
         )
 
         # Create assignments
@@ -198,7 +198,7 @@ class WorkforceScheduleUnassignedTest(WorkforceScheduleAPITestBase):
         """Test mix of assigned and unassigned workers."""
         unassigned_worker = Employee.objects.create(name="General Worker")
         unassigned_task = Task.objects.create(
-            name="Maintenance Work", duration=4, date=date(2025, 1, 11)
+            duration=4, date=date(2025, 1, 11)
         )
         Assignment.objects.create(
             worker=unassigned_worker, task=unassigned_task,
@@ -226,13 +226,11 @@ class WorkforceScheduleUnassignedTasksTest(WorkforceScheduleAPITestBase):
         """Test that unassigned tasks appear as 'Unassigned Tasks' rows."""
         # Create some tasks without assignments
         Task.objects.create(
-            name="Unassigned Task 1",
             position=self.position1,
             duration=3,
             date=date(2025, 1, 11)
         )
         Task.objects.create(
-            name="Unassigned Task 2",
             position=self.position2,
             duration=2,
             date=date(2025, 1, 12)
@@ -261,7 +259,6 @@ class WorkforceScheduleUnassignedTasksTest(WorkforceScheduleAPITestBase):
         """Test positions with both assigned workers and unassigned tasks."""
         # Create an unassigned task for position1 (which already has assigned workers)
         Task.objects.create(
-            name="Extra Task",
             position=self.position1,
             duration=4,
             date=date(2025, 1, 11)
@@ -296,12 +293,10 @@ class WorkforceScheduleUnassignedTasksTest(WorkforceScheduleAPITestBase):
         """Test unassigned tasks that also have no position."""
         # Create tasks without position and without assignment
         Task.objects.create(
-            name="General Unassigned Task 1",
             duration=2,
             date=date(2025, 1, 11)
         )
         Task.objects.create(
-            name="General Unassigned Task 2",
             position=None,
             duration=3,
             date=date(2025, 1, 12)
@@ -396,7 +391,6 @@ class TaskAssignmentAPITest(WorkforceScheduleAPITestBase):
 
         # Create tasks for Position 1
         task1 = Task.objects.create(
-            name="Position 1 Task",
             position=self.position1,
             duration=4,
             date=date(2025, 1, 11)
@@ -404,7 +398,6 @@ class TaskAssignmentAPITest(WorkforceScheduleAPITestBase):
 
         # Create tasks for Position 2
         task2 = Task.objects.create(
-            name="Position 2 Task",
             position=self.position2,
             duration=3,
             date=date(2025, 1, 11)
@@ -435,7 +428,6 @@ class TaskAssignmentAPITest(WorkforceScheduleAPITestBase):
         # Create multiple tasks for Position 1 on the same day
         for i in range(5):
             Task.objects.create(
-                name=f"Long Task {i+1}",
                 position=self.position1,
                 duration=3,  # 5 tasks × 3 hours = 15 hours total
                 date=date(2025, 1, 11)
@@ -472,7 +464,6 @@ class TaskAssignmentAPITest(WorkforceScheduleAPITestBase):
 
         # Create exactly 8 hours of work for Position 1 (should utilize 1 worker fully)
         Task.objects.create(
-            name="Full Day Task",
             position=self.position1,
             duration=8,
             date=date(2025, 1, 11)
@@ -507,7 +498,6 @@ class TaskAssignmentAPITest(WorkforceScheduleAPITestBase):
         # Create a position with no workers
         orphan_position = Position.objects.create(name="Orphan Position")
         Task.objects.create(
-            name="Orphan Task",
             position=orphan_position,
             duration=4,
             date=date(2025, 1, 11)
@@ -537,7 +527,7 @@ class WorkforceScheduleEdgeCaseTest(WorkforceScheduleAPITestBase):
     def test_multiple_assignments_same_day(self):
         """Test aggregation when worker has multiple assignments on same day."""
         task4 = Task.objects.create(
-            name="Task 4", position=self.position1, duration=2, date=date(2025, 1, 11)
+            position=self.position1, duration=2, date=date(2025, 1, 11)
         )
         Assignment.objects.create(
             worker=self.worker1, task=task4, work_date=date(2025, 1, 11), hours=2

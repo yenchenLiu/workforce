@@ -13,8 +13,6 @@ class Employee(models.Model):
         on_delete=models.SET_NULL,
         related_name="employees"
     )
-    # For example, if an employee can work a maximum of 8 hours per day,
-    daily_capacity = models.PositiveSmallIntegerField(default=8)
 
 class Task(models.Model):
     id         = models.BigAutoField(primary_key=True)
@@ -24,7 +22,6 @@ class Task(models.Model):
         on_delete=models.SET_NULL,
         related_name="tasks"
     )
-    name       = models.CharField(max_length=200)
     duration   = models.PositiveSmallIntegerField()
     date       = models.DateField(db_index=True)
 

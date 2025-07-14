@@ -49,13 +49,16 @@ def get_workforce_schedule(request: HttpRequest, start_date: date | None = None,
 @api.post("/assign-tasks", response=TaskAssignmentResponseSchema)
 def assign_tasks(request: HttpRequest, start_date: date, end_date: date) -> TaskAssignmentResponseSchema:
     """
-    Assign tasks to workers using greedy balanced approach.
+    Assign tasks to workers using a linear programming (LP) approach.
     Returns task assignments and KPI metrics.
 
     Strategy:
-    - Groups tasks by date and position
-    - Uses greedy algorithm to assign tasks to workers with least current load
-    - Respects position matching and 8-hour daily capacity constraints
+    - Formulates an LP problem to assign tasks to workers while respecting constraints
+    - Constraints:
+      - Workers can only be assigned tasks that match their position
+      - Workers can have at most 8 hours of work per day
+    - Objective:
+      - Maximise total assigned hours (or minimise unassigned work)
 
     KPIs returned:
     - utilization_rate: Total assigned hours / (workers × 8 hours)
