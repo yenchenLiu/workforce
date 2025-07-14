@@ -1,5 +1,7 @@
 # Workforce Scheduling
 
+[![codecov](https://codecov.io/gh/yenchenLiu/workforce/branch/main/graph/badge.svg)](https://codecov.io/gh/yenchenLiu/workforce)
+
 This is a Django-based workforce scheduling application.
 
 ## System Requirements
