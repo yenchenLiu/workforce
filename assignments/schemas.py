@@ -1,36 +1,35 @@
 from ninja import Schema
-from typing import List, Dict
 
 
 class WorkforceScheduleRowSchema(Schema):
     """Single row in the workforce schedule table (position or worker)."""
     name: str
     type: str  # 'position' or 'worker'
-    daily_hours: Dict[str, int]  # key is date string, value is total hours
+    daily_hours: dict[str, int]  # key is date string, value is total hours
 
 
 class WorkforceScheduleResponseSchema(Schema):
     """Complete response schema for workforce schedule endpoint."""
-    data: List[WorkforceScheduleRowSchema]
-    date_columns: List[str]
+    data: list[WorkforceScheduleRowSchema]
+    date_columns: list[str]
 
 
 class PositionHoursData(Schema):
     """Position daily hours data."""
     name: str
-    daily_hours: Dict[str, int]
+    daily_hours: dict[str, int]
 
 
 class WorkerHoursData(Schema):
     """Worker daily hours data."""
     name: str
-    daily_hours: Dict[str, int]
+    daily_hours: dict[str, int]
 
 
 class AggregatedScheduleData(Schema):
     """Aggregated schedule data container."""
-    positions: List[PositionHoursData]
-    workers_by_position: Dict[str, List[WorkerHoursData]]
+    positions: list[PositionHoursData]
+    workers_by_position: dict[str, list[WorkerHoursData]]
 
 
 class TaskAssignmentSchema(Schema):
@@ -56,6 +55,6 @@ class KPIMetricsSchema(Schema):
 
 class TaskAssignmentResponseSchema(Schema):
     """Response schema for task assignment endpoint."""
-    assignments: List[TaskAssignmentSchema]
+    assignments: list[TaskAssignmentSchema]
     kpi_metrics: KPIMetricsSchema
-    summary: Dict[str, int | list[int]]  # Summary statistics
+    summary: dict[str, int | list[int]]  # Summary statistics
