@@ -62,4 +62,9 @@ To view the API documentation, navigate to `http://127.0.0.1:8000/api/docs` in y
 
 ## assign-tasks API
 
-The `assign-tasks` API uses linear programming to schedule tasks. It returns the assignment results and relevant KPI data.
+The `assign-tasks` API schedules tasks for workers. It can use one of two methods: Linear Programming (default) or a Greedy algorithm. The API returns the assignment results and relevant KPI data.
+
+You can select the method using the `method` query parameter in your POST request to `/api/assign-tasks`.
+
+-   `method=lp` (default): Uses linear programming to find an optimal task assignment. This method aims to maximize the total hours assigned to workers, subject to constraints like worker availability and skills.
+-   `method=greedy`: Uses a greedy algorithm that assigns tasks one by one to the most suitable available worker. This method is faster but may not produce a globally optimal solution.

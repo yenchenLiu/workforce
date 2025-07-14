@@ -1,6 +1,7 @@
 from ninja import NinjaAPI, Swagger
 from datetime import date
 from django.http import HttpRequest
+from typing import Literal
 from .services import WorkforceScheduleService, TaskAssignmentService
 from .schemas import WorkforceScheduleRowSchema, WorkforceScheduleResponseSchema, TaskAssignmentResponseSchema
 
@@ -47,18 +48,28 @@ def get_workforce_schedule(request: HttpRequest, start_date: date | None = None,
     )
 
 @api.post("/assign-tasks", response=TaskAssignmentResponseSchema)
-def assign_tasks(request: HttpRequest, start_date: date, end_date: date) -> TaskAssignmentResponseSchema:
+def assign_tasks(request: HttpRequest, start_date: date, end_date: date, method: Literal['lp', 'greedy'] = 'lp') -> TaskAssignmentResponseSchema:
     """
-    Assign tasks to workers using a linear programming (LP) approach.
+    Assign tasks to workers using either Linear Programming (LP) or Greedy approach.
     Returns task assignments and KPI metrics.
 
-    Strategy:
+    Parameters:
+    - start_date: Start date for task assignment
+    - end_date: End date for task assignment
+    - method: Assignment method ('lp' or 'greedy'). Defaults to 'lp'.
+
+    LP Strategy:
     - Formulates an LP problem to assign tasks to workers while respecting constraints
     - Constraints:
       - Workers can only be assigned tasks that match their position
       - Workers can have at most 8 hours of work per day
     - Objective:
       - Maximise total assigned hours (or minimise unassigned work)
+
+    Greedy Strategy:
+    - Groups tasks by date and position
+    - Assigns each task to the worker with the least current workload
+    - Balances workload distribution among workers
 
     KPIs returned:
     - utilization_rate: Total assigned hours / (workers × 8 hours)
@@ -67,7 +78,7 @@ def assign_tasks(request: HttpRequest, start_date: date, end_date: date) -> Task
     - gini_coefficient: Measures workload distribution equality (0 = perfectly equal)
     """
     # Get assignment data using service
-    assignment_schemas, kpi_metrics, summary = TaskAssignmentService.create_task_assignments(start_date, end_date)
+    assignment_schemas, kpi_metrics, summary = TaskAssignmentService.create_task_assignments(start_date, end_date, method)
 
     return TaskAssignmentResponseSchema(
         assignments=assignment_schemas,
