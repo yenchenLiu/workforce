@@ -57,12 +57,7 @@ class WorkforceScheduleService:
         for assignment in assignments:
             date_str = assignment.work_date.strftime('%d %b')
 
-            # Determine position name - use "Unassigned" if no position
-            if assignment.task.position:
-                position_name = assignment.task.position.name
-            else:
-                position_name = UNASSIGNED_POSITION
-
+            position_name = assignment.task.position.name if assignment.task.position else UNASSIGNED_POSITION
             position_hours[position_name][date_str] += assignment.hours
 
             if assignment.worker:
@@ -75,11 +70,7 @@ class WorkforceScheduleService:
         for task in unassigned_tasks:
             date_str = task.date.strftime('%d %b')
 
-            if task.position:
-                position_name = task.position.name
-            else:
-                position_name = UNASSIGNED_POSITION
-
+            position_name = task.position.name if task.position else UNASSIGNED_POSITION
             unassigned_tasks_by_position[position_name][date_str] += task.duration
 
         # Convert to schema objects
