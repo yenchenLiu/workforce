@@ -42,6 +42,13 @@ To run the unit tests, use the following command:
 python manage.py test
 ```
 
+To generate a test coverage report, you can use the following commands:
+
+```bash
+coverage run --source='.' manage.py test
+coverage report
+```
+
 ## API Documentation
 
 To view the API documentation, navigate to `http://127.0.0.1:8000/api/docs` in your browser.

@@ -2,3 +2,4 @@ django~=5.2.4
 django-ninja~=1.4.3
 django-stubs[compatible-mypy]~=5.2.1
 ruff
+coverage

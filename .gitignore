@@ -6,3 +6,8 @@
 
 # Database
 *.sqlite3
+
+# Python cache
+__pycache__/
+.coverage
+
