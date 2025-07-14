@@ -1,0 +1,12 @@
+[
+  { "id": 1, "name": "Patrick Murphy", "position_id": 1 },
+  { "id": 3, "name": "Jeanne Crawford", "position_id": 1 },
+  { "id": 4, "name": "Keith Huerta", "position_id": 1 },
+  { "id": 5, "name": "Tania Key", "position_id": 1 },
+  { "id": 6, "name": "Ward Harmon", "position_id": 2 },
+  { "id": 7, "name": "Preston Rivers", "position_id": 2 },
+  { "id": 2, "name": "Wyatt Booth", "position_id": 3 },
+  { "id": 8, "name": "Samual Sweeney", "position_id": 1 },
+  { "id": 9, "name": "Shawn Shelton", "position_id": 3 },
+  { "id": 10, "name": "Jewell Gallegos", "position_id": 2 }
+]
