@@ -219,6 +219,132 @@ class WorkforceScheduleUnassignedTest(WorkforceScheduleAPITestBase):
         self.assertEqual(unassigned['daily_hours'], {'11 Jan': 4, '12 Jan': 0})
 
 
+class WorkforceScheduleUnassignedTasksTest(WorkforceScheduleAPITestBase):
+    """Test handling of tasks that have not been assigned to workers."""
+
+    def test_unassigned_tasks_display(self):
+        """Test that unassigned tasks appear as 'Unassigned Tasks' rows."""
+        # Create some tasks without assignments
+        Task.objects.create(
+            name="Unassigned Task 1",
+            position=self.position1,
+            duration=3,
+            date=date(2025, 1, 11)
+        )
+        Task.objects.create(
+            name="Unassigned Task 2",
+            position=self.position2,
+            duration=2,
+            date=date(2025, 1, 12)
+        )
+
+        response = self.get_api_response('2025-01-11', '2025-01-12')
+        data = response.json()
+
+        # Find "Unassigned Tasks" rows
+        unassigned_tasks_rows = [
+            row for row in data['data']
+            if row['name'] == 'Unassigned Tasks' and row['type'] == 'worker'
+        ]
+
+        # Should have unassigned tasks for both positions
+        self.assertEqual(len(unassigned_tasks_rows), 2)
+
+        # Verify the hours for each position's unassigned tasks
+        for row in unassigned_tasks_rows:
+            if row['daily_hours']['11 Jan'] == 3:  # Position 1 unassigned task
+                self.assertEqual(row['daily_hours']['12 Jan'], 0)
+            elif row['daily_hours']['12 Jan'] == 2:  # Position 2 unassigned task
+                self.assertEqual(row['daily_hours']['11 Jan'], 0)
+
+    def test_mixed_assigned_and_unassigned_tasks(self):
+        """Test positions with both assigned workers and unassigned tasks."""
+        # Create an unassigned task for position1 (which already has assigned workers)
+        Task.objects.create(
+            name="Extra Task",
+            position=self.position1,
+            duration=4,
+            date=date(2025, 1, 11)
+        )
+
+        response = self.get_api_response('2025-01-11', '2025-01-12')
+        data = response.json()
+
+        # Find Position 1 data
+        pos1_workers = [
+            row for row in data['data']
+            if row['type'] == 'worker' and
+            any(prev_row['name'] == 'Position 1' and prev_row['type'] == 'position'
+                for prev_row in data['data'][:data['data'].index(row)])
+        ]
+
+        # Should have Worker 1, Worker 2, and Unassigned Tasks
+        worker_names = [worker['name'] for worker in pos1_workers]
+        self.assertIn('Worker 1', worker_names)
+        self.assertIn('Worker 2', worker_names)
+        self.assertIn('Unassigned Tasks', worker_names)
+
+        # Verify unassigned tasks hours
+        unassigned_row = next(
+            worker for worker in pos1_workers
+            if worker['name'] == 'Unassigned Tasks'
+        )
+        self.assertEqual(unassigned_row['daily_hours']['11 Jan'], 4)
+        self.assertEqual(unassigned_row['daily_hours']['12 Jan'], 0)
+
+    def test_unassigned_tasks_for_unassigned_position(self):
+        """Test unassigned tasks that also have no position."""
+        # Create tasks without position and without assignment
+        Task.objects.create(
+            name="General Unassigned Task 1",
+            duration=2,
+            date=date(2025, 1, 11)
+        )
+        Task.objects.create(
+            name="General Unassigned Task 2",
+            position=None,
+            duration=3,
+            date=date(2025, 1, 12)
+        )
+
+        response = self.get_api_response('2025-01-11', '2025-01-12')
+        data = response.json()
+
+        # Should have "Unassigned" position
+        unassigned_position = self.find_row_by_name_type(data, 'Unassigned', 'position')
+        self.assertIsNotNone(unassigned_position)
+
+        # Find the "Unassigned Tasks" row under "Unassigned" position
+        unassigned_tasks_row = None
+        found_unassigned_position = False
+
+        for row in data['data']:
+            if row['name'] == 'Unassigned' and row['type'] == 'position':
+                found_unassigned_position = True
+            elif found_unassigned_position and row['name'] == 'Unassigned Tasks':
+                unassigned_tasks_row = row
+                break
+            elif row['type'] == 'position' and row['name'] != 'Unassigned':
+                found_unassigned_position = False
+
+        self.assertIsNotNone(unassigned_tasks_row)
+        self.assertEqual(unassigned_tasks_row['daily_hours']['11 Jan'], 2)
+        self.assertEqual(unassigned_tasks_row['daily_hours']['12 Jan'], 3)
+
+    def test_no_unassigned_tasks(self):
+        """Test that no 'Unassigned Tasks' rows appear when all tasks are assigned."""
+        # All tasks in base setup are assigned, so no unassigned tasks should appear
+        response = self.get_api_response('2025-01-11', '2025-01-12')
+        data = response.json()
+
+        # Should not have any "Unassigned Tasks" rows
+        unassigned_tasks_rows = [
+            row for row in data['data']
+            if row['name'] == 'Unassigned Tasks'
+        ]
+        self.assertEqual(len(unassigned_tasks_rows), 0)
+
+
 class WorkforceScheduleEdgeCaseTest(WorkforceScheduleAPITestBase):
     """Test edge cases and special scenarios."""
 

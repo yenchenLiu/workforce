@@ -43,13 +43,9 @@
   { "task_id": 42, "worker_id": 9 },
   { "task_id": 43, "worker_id": 1 },
   { "task_id": 44, "worker_id": 8 },
-  { "task_id": 45, "worker_id": 9 },
   { "task_id": 46, "worker_id": 3 },
   { "task_id": 47, "worker_id": 2 },
   { "task_id": 48, "worker_id": 9 },
-  { "task_id": 49, "worker_id": 2 },
-  { "task_id": 50, "worker_id": 2 },
   { "task_id": 51, "worker_id": 11 },
-  { "task_id": 52, "worker_id": 12 },
-  { "task_id": 53, "worker_id": 13 }
+  { "task_id": 52, "worker_id": 12 }
 ]
